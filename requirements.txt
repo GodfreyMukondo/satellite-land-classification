@@ -1,0 +1,8 @@
+tensorflow
+torch
+torchvision
+numpy
+matplotlib
+scikit-learn
+tqdm
+requests
