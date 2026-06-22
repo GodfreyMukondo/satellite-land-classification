@@ -148,5 +148,3 @@ End-to-end ML pipeline
 Dual-framework implementation (PyTorch + TensorFlow)
 Model comparison techniques
 Real satellite image classification
-
-## 💾 Saved Models
