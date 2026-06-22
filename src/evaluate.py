@@ -10,15 +10,18 @@ from tqdm import tqdm
 from src.config import *
 from src.utils import get_keras_loader, get_pytorch_loader
 from src.metrics import print_metrics, plot_roc_curve
-from src.train import CNNModel, build_keras_model
+from src.model import CNNModel, build_keras_model
 
+
+# ============================================================
+# KERAS EVALUATION
+# ============================================================
 
 def evaluate_keras():
     """
-    Load and evaluate the Keras model.
+    Load and evaluate Keras model (weights only)
     """
 
-    # FIX: use WEIGHTS path (not full .keras model)
     if not os.path.exists(KERAS_WEIGHTS_PATH):
         raise FileNotFoundError(
             f"Keras weights not found at {KERAS_WEIGHTS_PATH}"
@@ -28,17 +31,12 @@ def evaluate_keras():
 
     loader = get_keras_loader()
 
-    # Rebuild architecture first (correct approach)
     model = build_keras_model()
-
-    # Load only weights (fixes deserialization issues)
     model.load_weights(KERAS_WEIGHTS_PATH)
 
     print("Running Keras inference...")
 
     probabilities = model.predict(loader, verbose=0)
-
-    # Safe binary classification handling
     probabilities = probabilities[:, 1]
 
     predictions = (probabilities > 0.5).astype(int)
@@ -48,10 +46,11 @@ def evaluate_keras():
     return labels, predictions, probabilities
 
 
+# ============================================================
+# PYTORCH EVALUATION
+# ============================================================
+
 def evaluate_pytorch():
-    """
-    Load and evaluate the PyTorch model.
-    """
 
     if not os.path.exists(PYTORCH_MODEL_PATH):
         raise FileNotFoundError(
@@ -63,44 +62,38 @@ def evaluate_pytorch():
     loader = get_pytorch_loader()
 
     model = CNNModel().to(DEVICE)
-
-    model.load_state_dict(
-        torch.load(PYTORCH_MODEL_PATH, map_location=DEVICE)
-    )
-
+    model.load_state_dict(torch.load(PYTORCH_MODEL_PATH, map_location=DEVICE))
     model.eval()
 
-    all_predictions = []
-    all_probabilities = []
-    all_labels = []
+    all_preds, all_probs, all_labels = [], [], []
 
     print("Running PyTorch inference...")
 
     with torch.no_grad():
         for images, labels in tqdm(loader):
-
             images = images.to(DEVICE)
 
             outputs = model(images)
 
-            probabilities = F.softmax(outputs, dim=1)[:, 1]
-            predictions = torch.argmax(outputs, dim=1)
+            probs = F.softmax(outputs, dim=1)[:, 1]
+            preds = torch.argmax(outputs, dim=1)
 
-            all_probabilities.extend(probabilities.cpu().numpy())
-            all_predictions.extend(predictions.cpu().numpy())
+            all_probs.extend(probs.cpu().numpy())
+            all_preds.extend(preds.cpu().numpy())
             all_labels.extend(labels.numpy())
 
     return (
         np.array(all_labels),
-        np.array(all_predictions),
-        np.array(all_probabilities)
+        np.array(all_preds),
+        np.array(all_probs)
     )
 
 
+# ============================================================
+# COMPARISON
+# ============================================================
+
 def compare_models():
-    """
-    Evaluate both models and compare results.
-    """
 
     keras_labels, keras_preds, keras_probs = evaluate_keras()
     pytorch_labels, pytorch_preds, pytorch_probs = evaluate_pytorch()
